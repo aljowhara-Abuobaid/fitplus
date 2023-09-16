@@ -7,7 +7,8 @@ import 'package:fitplus/value/constant.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/services.dart';
-
+import 'login.dart';
+import 'package:get/route_manager.dart';
 
 class CreateAccountManagerGym extends StatefulWidget {
   CreateAccountManagerGym({Key? key}) : super(key: key);
@@ -883,14 +884,14 @@ class _CreateAccountManagerGymState extends State<CreateAccountManagerGym> {
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(SnackBar(
                                         content: Text(
-                                            "you must start mumber 05"),
+                                            "The phone number must start with 05"),
                                         backgroundColor: Colors.redAccent,
                                       ));
                                     } else if(widget.phone.text.toString()[1] != '5'){
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(SnackBar(
                                         content: Text(
-                                            "you must start mumber 05"),
+                                            "The phone number must start with 05"),
                                         backgroundColor: Colors.redAccent,
                                       ));
                                     } else if (widget.nameGym.text
@@ -1064,7 +1065,10 @@ class _CreateAccountManagerGymState extends State<CreateAccountManagerGym> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(50),
                   ),
+                  
+
                 ),
+                
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -1083,7 +1087,34 @@ class _CreateAccountManagerGymState extends State<CreateAccountManagerGym> {
           ),
           SizedBox(
             height: 30,
-          )
+          ) ,
+          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'If already have an account ',
+                                style: TextStyle(fontSize: 17),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  //Navigator.push(context, MaterialPageRoute(builder: (context)=>SignupPick()));
+                                  Get.offAll(() => MyLogin());
+                                },
+                                child: Text(
+                                  'Log in',
+                                  textAlign: TextAlign.left,
+                                  style: TextStyle(
+                                      decoration: TextDecoration.underline,
+                                      color: Colors.black,
+                                      fontSize: 20),
+                                ),
+                                style: ButtonStyle(),
+                              ),
+                            ],
+                          ),
+                            SizedBox(
+                            height: 80,
+                          ),
         ],
       ),
     );
@@ -1137,4 +1168,3 @@ class _CreateAccountManagerGymState extends State<CreateAccountManagerGym> {
     return Regex.hasMatch(phoneNumber);
   }
 }
-
