@@ -1,16 +1,25 @@
-import 'dart:io';
+import 'dart:convert';
 
-import 'package:fitplus/firebase/fb_auth_controller.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fitplus/firebase/fb_firestore.dart';
+import 'package:fitplus/firebase/fb_httpNotification.dart';
 import 'package:fitplus/src/controller/splash_screens_controller.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:flutter_svprogresshud/flutter_svprogresshud.dart';
+import 'package:get/get.dart';
+import 'package:http/http.dart' as http;
 
 class DetailsGymScreen extends StatefulWidget {
-  DetailsGymScreen({required this.data});
+  DetailsGymScreen({required this.data, this.subscribeUser = false});
+
+  Map<String, dynamic>? paymentIntentData;
 
   int select = 1;
   late var data;
+  late bool subscribeUser;
+  int price = 0;
+  int month = 0;
 
   @override
   State<DetailsGymScreen> createState() => _DetailsGymScreenState();
@@ -23,7 +32,7 @@ class _DetailsGymScreenState extends State<DetailsGymScreen> {
       child: Scaffold(
         appBar: AppBar(
           elevation: 20,
-          backgroundColor: Color.fromARGB(255, 210, 199, 226),
+          backgroundColor: Color.fromARGB(255, 210, 199, 226),title: Text('Gym Description'),centerTitle: true,titleTextStyle: TextStyle(color: Colors.black, fontSize: 18),
         ),
         backgroundColor: Colors.white,
         body: SingleChildScrollView(
@@ -42,15 +51,15 @@ class _DetailsGymScreenState extends State<DetailsGymScreen> {
                       decoration: BoxDecoration(
                           border: Border.all(
                               color: Color.fromARGB(255, 210, 199, 226))),
-                      child:     widget.data['logo2'].isEmpty
+                      child: widget.data['logo2'].isEmpty
                           ? Center(child: Image.asset('assets/white.png'))
                           : Center(
-                        child: Image.network(
-                          widget.data['logo2'],
-                          fit: BoxFit.fill,
-                          width: double.infinity,
-                        ),
-                      ),
+                              child: Image.network(
+                                widget.data['logo2'],
+                                fit: BoxFit.fill,
+                                width: double.infinity,
+                              ),
+                            ),
                     ),
                     Align(
                       alignment: AlignmentDirectional.bottomStart,
@@ -94,30 +103,71 @@ class _DetailsGymScreenState extends State<DetailsGymScreen> {
                 child: Column(
                   children: [
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          Icons.location_on,
-                          color: Color(0xff48358e),
+                        Expanded(
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.location_on,
+                                    color: Color(0xff48358e),
+                                  ),
+                                  SizedBox(
+                                    width: 10,
+                                  ),
+                                  Text(widget.data['locationGym'])
+                                ],
+                              ),
+                              SizedBox(
+                                height: 15,
+                              ),
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.info_outline_rounded,
+                                    color: Color(0xff48358e),
+                                  ),
+                                  SizedBox(
+                                    width: 10,
+                                  ),
+                                  Text('Discription'),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                        SizedBox(
-                          width: 10,
+                        Column(
+                          children: [
+                            GestureDetector(
+                              onTap: () {
+                                if (!widget.subscribeUser) {
+                                  showSubscribe(
+                                      context: context, dataGym: widget.data);
+                                }
+                              },
+                              child: Container(
+                                height: 40,
+                                padding: EdgeInsets.symmetric(horizontal: 15),
+                                decoration: BoxDecoration(
+                                  color: !widget.subscribeUser
+                                      ? Color.fromARGB(255, 186, 173, 205)
+                                      : Colors.grey,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Center(
+                                    child: Text(
+                                        !widget.subscribeUser
+                                            ? 'Subscribe Now'
+                                            : 'subscribed',
+                                        style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold))),
+                              ),
+                            )
+                          ],
                         ),
-                        Text(widget.data['locationGym'])
-                      ],
-                    ),
-                    SizedBox(
-                      height: 15,
-                    ),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline_rounded,
-                          color: Color(0xff48358e),
-                        ),
-                        SizedBox(
-                          width: 10,
-                        ),
-                        Text('Discription'),
                       ],
                     ),
                     SizedBox(
@@ -396,8 +446,7 @@ class _DetailsGymScreenState extends State<DetailsGymScreen> {
                       child: widget.data['offers'].isEmpty
                           ? Container(
                               height: 150,
-                          child: Center(child: Text('No offers')),
-
+                              child: Center(child: Text('No offers')),
                             )
                           : ListView.builder(
                               physics: NeverScrollableScrollPhysics(),
@@ -430,5 +479,200 @@ class _DetailsGymScreenState extends State<DetailsGymScreen> {
         ),
       ),
     );
+  }
+
+  showSubscribe({required BuildContext context, required var dataGym}) {
+    Map<String, dynamic> data = dataGym['price'];
+    var sortedKeys = data.keys.toList()
+      ..sort((a, b) => int.parse(a).compareTo(int.parse(b)));
+    showModalBottomSheet(
+        isScrollControlled: true,
+        context: context,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(
+              topRight: Radius.circular(20.0), topLeft: Radius.circular(20.0)),
+        ),
+        builder: (context) {
+          return SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                children: [
+                  SizedBox(
+                    height: 10,
+                  ),
+                  ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: sortedKeys.length,
+                    itemBuilder: (context, index) {
+                      var month = sortedKeys[index];
+                      var price = data[month.toString()];
+                      return GestureDetector(
+                        onTap: () {
+                          widget.price = int.parse(price.toString());
+                          widget.month = int.parse(month.toString());
+                          SVProgressHUD.show();
+                          Get.back();
+                          makePayment();
+                        },
+                        child: Container(
+                          height: 40,
+                          margin: EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.black),
+                          ),
+                          child: Center(
+                              child: Text(
+                                  'Subscribe ${month.toString()} Month in ${price} SAR')),
+                        ),
+                      );
+                    },
+                  )
+                ],
+              ),
+            ),
+          );
+        });
+  }
+
+  Future<void> makePayment() async {
+    try {
+      widget.paymentIntentData =
+          await createPaymentIntent('', 'SAR'); //json.decode(response.body);
+      // print('Response body==>${response.body.toString()}');
+      await Stripe.instance.initPaymentSheet(
+          paymentSheetParameters: SetupPaymentSheetParameters(
+              paymentIntentClientSecret:
+                  widget.paymentIntentData!['client_secret'],
+              applePay: true,
+              googlePay: true,
+              testEnv: true,
+              style: ThemeMode.dark,
+              merchantCountryCode: 'SA',
+              merchantDisplayName: 'ANNIE'));
+
+      ///now finally display payment sheeet
+      displayPaymentSheet();
+    } catch (e, s) {
+      print('exception:$e$s');
+    }
+  }
+
+  displayPaymentSheet() async {
+    SVProgressHUD.dismiss();
+    try {
+      await Stripe.instance
+          .presentPaymentSheet(
+              parameters: PresentPaymentSheetParameters(
+        clientSecret: widget.paymentIntentData!['client_secret'],
+        confirmPayment: true,
+      ))
+          .then((newValue) {
+        saveSubscriberUser();
+        setState(() {
+          widget.subscribeUser = true;
+        });
+
+        // print('payment intent'+widget.paymentIntentData!['id'].toString());
+        // print('payment intent'+widget.paymentIntentData!['client_secret'].toString());
+        // print('payment intent'+widget.paymentIntentData!['amount'].toString());
+        // print('payment intent'+widget.paymentIntentData.toString());
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text("paid successfully" ,
+          style: TextStyle(color: Colors.white),),
+          backgroundColor:Colors.green,),);
+        
+
+        widget.paymentIntentData = null;
+      }).onError((error, stackTrace) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+          "Payment process Incomplete",
+          style: TextStyle(color: Colors.white),),
+          backgroundColor:Colors.red,),);
+        
+        print('Exception/DISPLAYPAYMENTSHEET==> $error $stackTrace');
+      });
+    } on StripeException catch (e) {
+      print('Exception/DISPLAYPAYMENTSHEET==> $e');
+      showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+                content: Text("Cancelled "),
+              ));
+    } catch (e) {
+      print('$e');
+    }
+  }
+
+  //  Future<Map<String, dynamic>>
+  createPaymentIntent(String amount, String currency) async {
+    try {
+      Map<String, dynamic> body = {
+        'amount': '${widget.price.toString()}00',
+        // 'amount': calculateAmount(widget.price.toString()),
+        'currency': currency,
+        'payment_method_types[]': 'card'
+      };
+      print(body);
+      var response = await http.post(
+          Uri.parse('https://api.stripe.com/v1/payment_intents'),
+          body: body,
+          headers: {
+            'Authorization':
+                'Bearer sk_test_51KeFcDDG7u6dEAF5zPLPSwx75U5njpZxgeGdJoTzypzLMyISXaR0XIiCrPwNAyJjso39mYdyQTYGlMiQcrf3fsYF00BN2wmb7C',
+            'Content-Type': 'application/x-www-form-urlencoded'
+          });
+      print('Create Intent reponse ===> ${response.body.toString()}');
+      return jsonDecode(response.body);
+    } catch (err) {
+      print('err charging user: ${err.toString()}');
+    }
+  }
+
+  calculateAmount(String amount) {
+    final a = (int.parse(amount));
+    return a.toString();
+  }
+
+  saveSubscriberUser() {
+    // send Notification to gym
+    List fcm = [];
+    String fcmToken = widget.data['fcm'] ?? '';
+    fcm.add(fcmToken);
+    FbHttpNotificationRequest().sendNotification(
+        'New Subscribe', 'You have New Subscriber', fcm);
+    String uid = DateTime.now().microsecondsSinceEpoch.toString();
+    // save Notification in FireStore
+    var token = FirebaseAuth.instance.currentUser!.uid;
+    FbFireStoreController().createDocument(data: {
+      'userId': token,
+      'gymId': widget.data.id,
+      'userName':
+          '${AppController.to.loginMap['FName']} ${AppController.to.loginMap['LName']}',
+      'nameGym': widget.data['nameGym'],
+      'userEmail': AppController.to.loginMap['email'],
+      'gymEmail': widget.data['email'],
+      'month': widget.month,
+      'price': widget.price,
+      'showNotification': false,
+      'orderBy': uid,
+      'dateStartSubscriber': DateTime.now().toString().split(' ')[0],
+      'dateEndSubscriber': DateTime.now()
+          .add(Duration(days: (30 * widget.month)))
+          .toString()
+          .split(' ')[0],
+    }, uid: uid, nameCollection: 'subscribers');
+    FbFireStoreController().updateArray(
+        nameCollection: 'users',
+        data: [widget.data.id],
+        nameDoc: token,
+        nameList: 'listSubscribe');
+    FbFireStoreController().updateArray(
+        nameCollection: 'users',
+        data: [token],
+        nameDoc: widget.data.id,
+        nameList: 'listSubscribe');
   }
 }
